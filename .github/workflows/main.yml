@@ -1,0 +1,51 @@
+name: CI/CD/CT Pipeline
+
+on:
+  push:
+    branches: [ "main" ] # main 브랜치에 코드가 push될 때마다 실행
+
+jobs:
+  build-test-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. GitHub 코드 가져오기
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # 2. 파이썬 환경 세팅
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    # 3. 라이브러리 설치
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    # 4. 🔥 대망의 CT (지속적 테스트) 실행 🔥
+    - name: Run Tests with pytest
+      run: |
+        pytest test_main.py
+
+    # 5. 도커 허브 로그인
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    # 6. CI (도커 이미지 빌드 및 푸시)
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-first-cicd:latest
+
+    # 7. CD (Render로 자동 배포 트리거)
+    - name: Deploy to Render
+      if: success() # 위 단계(테스트 등)가 모두 성공했을 때만 배포!
+      run: |
+        curl -X POST ${{ secrets.RENDER_DEPLOY_HOOK }}
